@@ -1,82 +1,38 @@
 require('soundmanager2');
 
+var soundManager = window.soundManager;
 var sm2Loaded = false;  // Indicates whether SM2 has been loaded or not.
 var queue = [];         // Queue where we stuff adds and plays before SM2 has been loaded.
 var channels = {};      // Maps of the created channels where sounds are played
 var settings = {};      // General settings for each channel (only volume at the moment)
 var sounds = {};
 
-function loadSettings() {
-	var loadedSettings = localStorage.getItem('boomBox');
+var volumeTransitions = {
+	'none': function (soundId, params, cb) {
+		sounds[soundId].setVolume(params.volume);
+		if (cb) {
+			cb(soundId);
+		}
+	},
+	'fadeTo': function (soundId, params, cb) {
+		var volume = params.volume;
+		var sound = sounds[soundId];
+		var volumeStep = Math.round(50 * (volume - sound.volume) / params.time);
 
-	if (!loadedSettings) {
-		return;
+		sound.interval = setInterval(function () {
+			var vol = sound.volume + volumeStep;
+			if ((volume - vol) * (volume - sound.volume) < 0) {
+				sound.setVolume(volume);
+				clearInterval(sound.interval);
+				if (cb) {
+					cb(soundId);
+				}
+				return;
+			}
+
+			sound.setVolume(vol);
+		}, 50);
 	}
-
-	try {
-		settings = JSON.parse(loadedSettings);
-	} catch (e) {
-
-	}
-}
-
-loadSettings();
-
-/**
-* Add audio to a channel.
-*/
-function add(name, url) {
-
-	//Check if SM2 is loaded. If not, stuff it in a queue so we can set up the audio later.
-	if (!sm2Loaded) {
-		queue.push({
-			action: 'add',
-			name: name,
-			url: url
-		});
-
-		return;
-	}
-
-	sounds[name] = window.soundManager.createSound({
-		id: name,
-		url: url,
-		volume: 0,
-		autoPlay: false
-	});
-	sounds[name].channel = false;
-}
-
-
-function BoomBox() {
-
-}
-
-BoomBox.prototype.saveSettings = function () {
-	localStorage.setItem('boomBox', JSON.stringify(settings));
-};
-
-BoomBox.prototype.getChannelVolume = function (channelName) {
-	if (!settings[channelName]) {
-		return;
-	}
-	return settings[channelName].volume;
-};
-
-BoomBox.prototype.addChannel = function (name, volume) {
-	if (!channels[name]) {
-		channels[name] = {};
-		settings[name] = settings[name] || { volume: volume };
-	}
-};
-
-BoomBox.prototype.add = function (name, url) {
-
-	if (sounds[name]) {
-		return;
-	}
-
-	add(name, url);
 };
 
 function loopSound() {
@@ -118,32 +74,97 @@ function stopSound(soundId) {
 	}
 }
 
-var volumeTransitions = {
-	'none': function (soundId, params, cb) {
-		sounds[soundId].setVolume(params.volume);
-		if (cb) {
-			cb(soundId);
-		}
-	},
-	'fadeTo': function (soundId, params, cb) {
-		var volume = params.volume;
-		var sound = sounds[soundId];
-		var volumeStep = Math.round(50 * (volume - sound.volume) / params.time);
+//Set up the sound manager.
+soundManager.setup({
+	url: '/assets/swf/default/',
+	onready: function () {
+		sm2Loaded = true;
 
-		sound.interval = setInterval(function () {
-			var vol = sound.volume + volumeStep;
-			if ((volume - vol) * (volume - sound.volume) < 0) {
-				sound.setVolume(volume);
-				clearInterval(sound.interval);
-				if (cb) {
-					cb(soundId);
-				}
-				return;
+		for (var i = 0, l = queue.length; i < l; i++) {
+			var sound = queue[i];
+
+			if (sound.action === 'add') {
+				add(sound.name, sound.url);
+			} else if (sound.action === 'play') {
+				playSound(sound.channel, sound.name);
 			}
-
-			sound.setVolume(vol);
-		}, 50);
+		}
 	}
+});
+
+
+function loadSettings() {
+	var loadedSettings = localStorage.getItem('boomBox');
+
+	if (!loadedSettings) {
+		return;
+	}
+
+	try {
+		settings = JSON.parse(loadedSettings);
+	} catch (e) {
+		console.error('could not load the settings');
+	}
+}
+
+loadSettings();
+
+function add(name, url) {
+
+	//Check if SM2 is loaded. If not, stuff it in a queue so we can set up the audio later.
+	if (!sm2Loaded) {
+		queue.push({
+			action: 'add',
+			name: name,
+			url: url
+		});
+
+		return;
+	}
+
+	sounds[name] = soundManager.createSound({
+		id: name,
+		url: url,
+		volume: 0,
+		autoPlay: false
+	});
+	sounds[name].channel = false;
+}
+
+
+function BoomBox() {
+
+}
+
+BoomBox.prototype.saveSettings = function () {
+	try {
+		localStorage.setItem('boomBox', JSON.stringify(settings));
+	} catch (e) {
+		console.error('could not save the settings');
+	}
+};
+
+BoomBox.prototype.getChannelVolume = function (channelName) {
+	if (!settings[channelName]) {
+		return;
+	}
+	return settings[channelName].volume;
+};
+
+BoomBox.prototype.addChannel = function (name, volume) {
+	if (!channels[name]) {
+		channels[name] = {};
+		settings[name] = settings[name] || { volume: volume };
+	}
+};
+
+BoomBox.prototype.add = function (name, url) {
+
+	if (sounds[name]) {
+		return;
+	}
+
+	add(name, url);
 };
 
 BoomBox.prototype.play = function (channelName, soundList, params) {
@@ -253,11 +274,11 @@ BoomBox.prototype.stop = function (soundList, params) {
 /**
 * Mute audio on all channels.
 */
-Audio.prototype.muteAll = function () {
-	window.soundManager.mute();
+BoomBox.prototype.muteAll = function () {
+	soundManager.mute();
 };
 
-Audio.prototype.mute = function (channelName, params) {
+BoomBox.prototype.mute = function (channelName, params) {
 	params = params || {};
 	var channel = channels[channelName];
 	var transition = params.transition || 'fadeTo';
@@ -275,11 +296,11 @@ Audio.prototype.mute = function (channelName, params) {
 /**
 * Unmute audio on all channels
 */
-Audio.prototype.unmuteAll = function () {
-	window.soundManager.unmute();
+BoomBox.prototype.unmuteAll = function () {
+	BoomBox.unmute();
 };
 
-Audio.prototype.unmute = function (channelName, params) {
+BoomBox.prototype.unmute = function (channelName, params) {
 	params = params || {};
 	var channel = channels[channelName];
 	var transition = params.transition || 'fadeTo';
@@ -294,9 +315,6 @@ Audio.prototype.unmute = function (channelName, params) {
 	}
 };
 
-/**
-* Set the volume on a channel of choice.
-*/
 BoomBox.prototype.setVolume = function (channelName, volume) {
 	if (volume > 100 || volume < 0) {
 		return console.error('Volume needs to be a number between 0 and 100');
@@ -310,24 +328,4 @@ BoomBox.prototype.setVolume = function (channelName, volume) {
 	}
 };
 
-
-//Set up the sound manager.
-window.soundManager.setup({
-	url: '/assets/swf/default/',
-	onready: function () {
-		sm2Loaded = true;
-
-		for (var i = 0, l = queue.length; i < l; i++) {
-			var sound = queue[i];
-
-			if (sound.action === 'add') {
-				add(sound.name, sound.url);
-			} else if (sound.action === 'play') {
-				playSound(sound.channel, sound.name);
-			}
-		}
-	}
-});
-
-//Expose the audio module.
 module.exports = new BoomBox();

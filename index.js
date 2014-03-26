@@ -1,11 +1,11 @@
 require('soundmanager2');
 
 var soundManager = window.soundManager;
-var sm2Loaded = false;  // Indicates whether SM2 has been loaded or not.
-var queue = [];         // Queue where we stuff adds and plays before SM2 has been loaded.
-var channels = {};      // Maps of the created channels where sounds are played
-var settings = {};      // General settings for each channel (only volume at the moment)
-var sounds = {};
+var sm2Loaded = false; // Indicates whether SM2 has been loaded or not.
+var queue = []; // Queue where we stuff adds and plays before SM2 has been loaded.
+var channels = {}; // Maps of the created channels where sounds are played
+var settings = {}; // General settings for each channel (only volume at the moment)
+var sounds = {}; // list of available sounds
 
 var volumeTransitions = {
 	'none': function (soundId, params, cb) {

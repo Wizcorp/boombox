@@ -126,7 +126,8 @@ function add(name, url) {
 		id: name,
 		url: url,
 		volume: 0,
-		autoPlay: false
+		autoPlay: false,
+		autoLoad: false
 	});
 	sounds[name].channel = false;
 }

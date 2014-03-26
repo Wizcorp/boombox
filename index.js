@@ -43,7 +43,7 @@ function loopSound() {
 
 function deleteSound() {
 	this.volume = 0;
-	this.channel[this.id] = false;
+	delete this.channel[this.id];
 }
 
 function playSound(channelName, soundId, params) {
@@ -70,8 +70,31 @@ function stopSound(soundId) {
 	var sound = sounds[soundId];
 	if (sound) {
 		sound.stop();
-		sound.channel[soundId] = false;
+		sound.channel = false;
 	}
+}
+
+function add(id, url) {
+
+	//Check if SM2 is loaded. If not, stuff it in a queue so we can set up the audio later.
+	if (!sm2Loaded) {
+		queue.push({
+			action: 'add',
+			id: id,
+			url: url
+		});
+
+		return;
+	}
+
+	sounds[id] = soundManager.createSound({
+		id: id,
+		url: url,
+		volume: 0,
+		autoPlay: false,
+		autoLoad: false
+	});
+	sounds[id].channel = false;
 }
 
 //Set up the sound manager.
@@ -84,9 +107,9 @@ soundManager.setup({
 			var sound = queue[i];
 
 			if (sound.action === 'add') {
-				add(sound.name, sound.url);
+				add(sound.id, sound.url);
 			} else if (sound.action === 'play') {
-				playSound(sound.channel, sound.name);
+				playSound(sound.channel, sound.id);
 			}
 		}
 	}
@@ -109,29 +132,6 @@ function loadSettings() {
 
 loadSettings();
 
-function add(name, url) {
-
-	//Check if SM2 is loaded. If not, stuff it in a queue so we can set up the audio later.
-	if (!sm2Loaded) {
-		queue.push({
-			action: 'add',
-			name: name,
-			url: url
-		});
-
-		return;
-	}
-
-	sounds[name] = soundManager.createSound({
-		id: name,
-		url: url,
-		volume: 0,
-		autoPlay: false,
-		autoLoad: false
-	});
-	sounds[name].channel = false;
-}
-
 
 function BoomBox() {
 
@@ -147,7 +147,7 @@ BoomBox.prototype.saveSettings = function () {
 
 BoomBox.prototype.getChannelVolume = function (channelName) {
 	if (!settings[channelName]) {
-		return;
+		return 0;
 	}
 	return settings[channelName].volume;
 };
@@ -258,7 +258,7 @@ BoomBox.prototype.stop = function (soundList, params) {
 
 	var transParams = {
 		volume: 0,
-		time: params.stopTime || 500
+		time: params.time || 500
 	};
 	var transition = params.transition || 'fadeTo';
 
@@ -273,8 +273,8 @@ BoomBox.prototype.stop = function (soundList, params) {
 };
 
 /**
-* Mute audio on all channels.
-*/
+ * Mute audio on all channels.
+ */
 BoomBox.prototype.muteAll = function () {
 	soundManager.mute();
 };
@@ -295,8 +295,8 @@ BoomBox.prototype.mute = function (channelName, params) {
 };
 
 /**
-* Unmute audio on all channels
-*/
+ * Unmute audio on all channels
+ */
 BoomBox.prototype.unmuteAll = function () {
 	BoomBox.unmute();
 };

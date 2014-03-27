@@ -15,14 +15,15 @@ var volumeTransitions = {
 		}
 	},
 	'fadeTo': function (soundId, params, cb) {
-		var volume = params.volume;
+		var targetedVolume = params.volume;
 		var sound = sounds[soundId];
-		var volumeStep = Math.round(50 * (volume - sound.volume) / params.time);
+		var volumeStep = Math.ceil(50 * (targetedVolume - sound.volume) / params.time);
 
+		clearInterval(sound.interval);
 		sound.interval = setInterval(function () {
 			var vol = sound.volume + volumeStep;
-			if ((volume - vol) * (volume - sound.volume) < 0) {
-				sound.setVolume(volume);
+			if ((targetedVolume - vol) * (targetedVolume - sound.volume) <= 0) {
+				sound.setVolume(targetedVolume);
 				clearInterval(sound.interval);
 				if (cb) {
 					cb(soundId);
@@ -211,7 +212,6 @@ BoomBox.prototype.play = function (channelName, soundList, params) {
 
 		for (var id in channel) {
 			if (soundList.indexOf(id) === -1) {
-				clearInterval(channel[id].interval);
 				volumeTransitions[transition](id, transParams, stopSound);
 			}
 		}
@@ -232,7 +232,6 @@ BoomBox.prototype.play = function (channelName, soundList, params) {
 			return;
 		}
 
-		clearInterval(sound.interval);
 		volumeTransitions[transition](soundId, transParams);
 		if (!channel[soundId]) {
 			playSound(channelName, soundId, params);
@@ -266,8 +265,7 @@ BoomBox.prototype.stop = function (soundList, params) {
 		var soundId = soundList[i];
 		var sound = sounds[soundId];
 		if (sound && sound.channel) {
-			clearInterval(sound.interval);
-			volumeTransitions[transition](soundList[i], transParams, stopSound);
+			volumeTransitions[transition](soundId, transParams, stopSound);
 		}
 	}
 };
@@ -289,7 +287,6 @@ BoomBox.prototype.mute = function (channelName, params) {
 	};
 
 	for (var id in channel) {
-		clearInterval(channel[id].interval);
 		volumeTransitions[transition](id, transParams);
 	}
 };
@@ -311,7 +308,6 @@ BoomBox.prototype.unmute = function (channelName, params) {
 	};
 
 	for (var id in channel) {
-		clearInterval(channel[id].interval);
 		volumeTransitions[transition](id, transParams);
 	}
 };

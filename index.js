@@ -295,7 +295,7 @@ BoomBox.prototype.mute = function (channelName, params) {
  * Unmute audio on all channels
  */
 BoomBox.prototype.unmuteAll = function () {
-	BoomBox.unmute();
+	soundManager.unmute();
 };
 
 BoomBox.prototype.unmute = function (channelName, params) {
@@ -322,6 +322,18 @@ BoomBox.prototype.setVolume = function (channelName, volume) {
 	var channel = channels[channelName];
 	for (var id in channel) {
 		channel[id].setVolume(volume);
+	}
+};
+
+BoomBox.prototype.isMuted = function () {
+	return soundManager.muted;
+};
+
+BoomBox.prototype.toggleMuteAll = function () {
+	if (soundManager.muted) {
+		soundManager.unmuteAll();
+	} else {
+		soundManager.muteAll();
 	}
 };
 

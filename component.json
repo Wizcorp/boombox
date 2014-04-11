@@ -1,6 +1,6 @@
 {
 	"name": "boombox",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"dependencies": {
 		"Wizcorp/SoundManager2": "V2.97a.20131201-nodebug-jsmin"
 	},

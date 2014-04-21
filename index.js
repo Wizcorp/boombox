@@ -17,7 +17,12 @@ var volumeTransitions = {
 	'fadeTo': function (soundId, params, cb) {
 		var targetedVolume = params.volume;
 		var sound = sounds[soundId];
-		var volumeStep = Math.ceil(50 * (targetedVolume - sound.volume) / params.time);
+		var volumeRange = targetedVolume - sound.volume;
+		var volumeStep = Math.ceil(50 * Math.abs(volumeRange) / params.time);
+
+		if (volumeRange < 0) {
+			volumeStep = -volumeStep;
+		}
 
 		clearInterval(sound.interval);
 		sound.interval = setInterval(function () {

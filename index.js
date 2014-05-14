@@ -16,30 +16,30 @@ var volumeTransitions = {
 			cb(soundId);
 		}
 	},
-	fadeTo: function (soundId, params, cb) {
-		var targetedVolume = params.volume;
-		var sound = sounds[soundId];
-		var volumeRange = targetedVolume - sound.volume;
-		var volumeStep = Math.ceil(50 * Math.abs(volumeRange) / params.time);
+	fadeTo: function (soundId, volume, cb) {
+		var time = 500;
 
-		if (volumeRange < 0) {
-			volumeStep = -volumeStep;
-		}
+		var sound = sounds[soundId];
+
+		var diff = volume - sound.volume;
+		var volumeStep = Math.ceil(50 * diff / time);
+
+		var min = Math.max(volume, 0);
+		var max = Math.min(volume, 100);
 
 		clearInterval(sound.interval);
 		sound.interval = setInterval(function () {
-			var vol = sound.volume + volumeStep;
-			if ((targetedVolume - vol) * (targetedVolume - sound.volume) <= 0) {
-				sound.setVolume(targetedVolume);
+			var newVolume = Math.max(Math.min(max, sound.volume + volumeStep), min);
+
+			sound.setVolume(newVolume);
+
+			if (newVolume === volume) {
 				clearInterval(sound.interval);
 				if (cb) {
 					cb(soundId);
 				}
-				return;
 			}
-
-			sound.setVolume(vol);
-		}, 50);
+		}, 100);
 	}
 };
 
@@ -72,9 +72,7 @@ function playSound(channelName, soundId, params) {
 
 	if (!sound.loaded) {
 		options.onload = function () {
-			console.log(sound);
 			sound.play();
-			console.log(sound.playState);
 		};
 	}
 
@@ -217,25 +215,15 @@ BoomBox.prototype.play = function (channelName, soundList, params) {
 	var transParams, transition;
 
 	if (!params.hasOwnProperty('stopAll') || params.stopAll) {
-
 		transition = params.stopTransition || 'fadeTo';
-		transParams = {
-			volume: 0,
-			time: params.stopTime || 500
-		};
-
 		for (var id in channel) {
 			if (soundList.indexOf(id) === -1) {
-				volumeTransitions[transition](id, transParams, stopSound);
+				volumeTransitions[transition](id, 0, stopSound);
 			}
 		}
 	}
 
 	transition = params.transition || 'fadeTo';
-	transParams = {
-		volume: params.volume || settings[channelName].volume,
-		time: params.startTime || 500
-	};
 
 	for (var i = 0, len = soundList.length; i < len; i += 1) {
 		var soundId = soundList[i];
@@ -246,7 +234,9 @@ BoomBox.prototype.play = function (channelName, soundList, params) {
 			return;
 		}
 
-		volumeTransitions[transition](soundId, transParams);
+		var volume = params.volume || settings[channelName].volume;
+		volumeTransitions[transition](soundId, volume);
+
 		if (!channel[soundId]) {
 			playSound(channelName, soundId, params);
 		}
@@ -268,17 +258,13 @@ BoomBox.prototype.stop = function (soundList, params) {
 		soundList = [soundList];
 	}
 
-	var transParams = {
-		volume: 0,
-		time: params.time || 500
-	};
 	var transition = params.transition || 'fadeTo';
 
 	for (var i = 0, len = soundList.length; i < len; i += 1) {
 		var soundId = soundList[i];
 		var sound = sounds[soundId];
 		if (sound && sound.channel) {
-			volumeTransitions[transition](soundId, transParams, stopSound);
+			volumeTransitions[transition](soundId, 0, stopSound);
 		}
 	}
 };
@@ -292,15 +278,12 @@ BoomBox.prototype.muteAll = function () {
 
 BoomBox.prototype.mute = function (channelName, params) {
 	params = params || {};
+
 	var channel = channels[channelName];
 	var transition = params.transition || 'fadeTo';
-	var transParams = {
-		volume: 0,
-		time: 500
-	};
 
 	for (var id in channel) {
-		volumeTransitions[transition](id, transParams);
+		volumeTransitions[transition](id, 0);
 	}
 };
 
@@ -313,15 +296,12 @@ BoomBox.prototype.unmuteAll = function () {
 
 BoomBox.prototype.unmute = function (channelName, params) {
 	params = params || {};
+
 	var channel = channels[channelName];
 	var transition = params.transition || 'fadeTo';
-	var transParams = {
-		volume: settings[channelName].volume,
-		time: 500
-	};
 
 	for (var id in channel) {
-		volumeTransitions[transition](id, transParams);
+		volumeTransitions[transition](id, settings[channelName].volume);
 	}
 };
 

@@ -7,14 +7,16 @@ var channels = {}; // Maps of the created channels where sounds are played
 var settings = {}; // General settings for each channel (only volume at the moment)
 var sounds = {}; // list of available sounds
 
+var boombox;
+
 var volumeTransitions = {
-	'none': function (soundId, params, cb) {
+	none: function (soundId, params, cb) {
 		sounds[soundId].setVolume(params.volume);
 		if (cb) {
 			cb(soundId);
 		}
 	},
-	'fadeTo': function (soundId, params, cb) {
+	fadeTo: function (soundId, params, cb) {
 		var targetedVolume = params.volume;
 		var sound = sounds[soundId];
 		var volumeRange = targetedVolume - sound.volume;
@@ -53,14 +55,11 @@ function deleteSound() {
 }
 
 function playSound(channelName, soundId, params) {
+	params = params || {};
+
 	var channel = channels[channelName];
 
-	var onFinish;
-	if (params.loop) {
-		onFinish = loopSound;
-	} else {
-		onFinish = deleteSound;
-	}
+	var onFinish = params.loop ? loopSound : deleteSound;
 
 	var sound = sounds[soundId];
 	sound.channel = channel;
@@ -69,7 +68,17 @@ function playSound(channelName, soundId, params) {
 		sound.setPosition(0);
 	}
 
-	channel[soundId] = sound.play({ onfinish: onFinish, onstop: deleteSound });
+	var options = { onfinish: onFinish, onstop: deleteSound };
+
+	if (!sound.loaded) {
+		options.onload = function () {
+			console.log(sound);
+			sound.play();
+			console.log(sound.playState);
+		};
+	}
+
+	channel[soundId] = sound.play(options);
 }
 
 function stopSound(soundId) {
@@ -110,12 +119,12 @@ soundManager.setup({
 		sm2Loaded = true;
 
 		for (var i = 0, l = queue.length; i < l; i++) {
-			var sound = queue[i];
+			var queued = queue[i];
 
-			if (sound.action === 'add') {
-				add(sound.id, sound.url);
-			} else if (sound.action === 'play') {
-				playSound(sound.channel, sound.id);
+			if (queued.action === 'add') {
+				add(queued.id, queued.url);
+			} else if (queued.action === 'play') {
+				boombox.play(queued.channel, queued.id, queued.params);
 			}
 		}
 	}
@@ -198,7 +207,7 @@ BoomBox.prototype.play = function (channelName, soundList, params) {
 	if (!sm2Loaded) {
 		queue.push({
 			action: 'play',
-			soundList: soundList,
+			id: soundList,
 			channel: channelName,
 			params: params
 		});
@@ -253,7 +262,6 @@ BoomBox.prototype.stopChannel = function (channelName, params) {
 };
 
 BoomBox.prototype.stop = function (soundList, params) {
-
 	params = params || {};
 
 	if (typeof soundList === 'string') {
@@ -342,4 +350,4 @@ BoomBox.prototype.toggleMuteAll = function () {
 	}
 };
 
-module.exports = new BoomBox();
+module.exports = boombox = new BoomBox();

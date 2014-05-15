@@ -192,7 +192,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 		return;
 	}
 
-	if (channel[id]) {
+	if (channel[id] && !params.restart) {
 		return;
 	}
 

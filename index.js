@@ -18,18 +18,20 @@ var volumeTransitions = {
 	},
 	fadeTo: function (soundId, volume, cb) {
 		var time = 500;
+		var step = 50;
 
 		var sound = sounds[soundId];
 
 		var diff = volume - sound.volume;
-		var volumeStep = Math.ceil(50 * diff / time);
+		var volumeStep = Math.ceil(step * diff / time);
 
 		var min = Math.max(volume, 0);
 		var max = Math.min(volume, 100);
 
 		clearInterval(sound.interval);
 		sound.interval = setInterval(function () {
-			var newVolume = Math.max(Math.min(max, sound.volume + volumeStep), min);
+			var newVolume = sound.volume + volumeStep;
+			newVolume = volumeStep > 0 ? Math.min(newVolume, volume) : Math.max(newVolume, volume);
 
 			sound.setVolume(newVolume);
 
@@ -39,7 +41,7 @@ var volumeTransitions = {
 					cb(soundId);
 				}
 			}
-		}, 100);
+		}, step);
 	}
 };
 
@@ -70,17 +72,18 @@ function playSound(channelName, soundId, params) {
 
 	var options = { onfinish: onFinish, onstop: deleteSound };
 
-	if (!sound.loaded) {
-		options.onload = function () {
+	options.onload = function () {
+		if (sound.playState !== 1) {
 			sound.play();
-		};
-	}
+		}
+	};
 
 	channel[soundId] = sound.play(options);
 }
 
-function stopSound(soundId) {
-	var sound = sounds[soundId];
+function stopSound(id) {
+	var sound = sounds[id];
+
 	if (sound) {
 		sound.stop();
 		sound.channel = false;
@@ -173,7 +176,6 @@ BoomBox.prototype.addChannel = function (name, volume) {
 };
 
 BoomBox.prototype.add = function (name, url) {
-
 	if (sounds[name]) {
 		return;
 	}
@@ -181,66 +183,59 @@ BoomBox.prototype.add = function (name, url) {
 	add(name, url);
 };
 
-BoomBox.prototype.play = function (channelName, soundList, params) {
+BoomBox.prototype.play = function (channelName, id, params) {
 	params = params || {};
 	var channel = channels[channelName];
 
 	if (!channel) {
-		console.error('unknown channel ' + channelName);
+		console.error('unknown channel', channelName);
 		return;
 	}
 
-	if (typeof soundList === 'string') {
-		if (!sounds[soundList]) {
-			if (!params.path) {
-				console.error('the sound ' + soundList + ' does not exist.');
-				return;
-			}
+	if (channel[id]) {
+		return;
+	}
 
-			add(soundList, params.path);
+	if (!sounds[id]) {
+		if (!params.path) {
+			return console.error('the sound', id, 'does not exist.');
 		}
-		soundList = [soundList];
+
+		add(id, params.path);
 	}
 
 	if (!sm2Loaded) {
-		queue.push({
+		return queue.push({
 			action: 'play',
-			id: soundList,
+			id: id,
 			channel: channelName,
 			params: params
 		});
-		return;
 	}
 
-	var transParams, transition;
+	var transition;
 
 	if (!params.hasOwnProperty('stopAll') || params.stopAll) {
 		transition = params.stopTransition || 'fadeTo';
-		for (var id in channel) {
-			if (soundList.indexOf(id) === -1) {
-				volumeTransitions[transition](id, 0, stopSound);
+		for (var fadeId in channel) {
+			if (fadeId !== id) {
+				volumeTransitions[transition](fadeId, 0, stopSound);
 			}
 		}
 	}
 
 	transition = params.transition || 'fadeTo';
 
-	for (var i = 0, len = soundList.length; i < len; i += 1) {
-		var soundId = soundList[i];
-		var sound = sounds[soundId];
+	var sound = sounds[id];
 
-		if (!sound) {
-			console.error('the sound ' + soundId + ' does not exist.');
-			return;
-		}
-
-		var volume = params.volume || settings[channelName].volume;
-		volumeTransitions[transition](soundId, volume);
-
-		if (!channel[soundId]) {
-			playSound(channelName, soundId, params);
-		}
+	if (!sound) {
+		return console.error('the sound', id, 'does not exist.');
 	}
+
+	var volume = params.volume || settings[channelName].volume;
+	volumeTransitions[transition](id, volume);
+
+	playSound(channelName, id, params);
 };
 
 BoomBox.prototype.stopChannel = function (channelName, params) {

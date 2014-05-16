@@ -78,7 +78,7 @@ function playSound(channelName, soundId, params) {
 		}
 	};
 
-	channel[soundId] = sound.play(options);
+	channel[soundId] = soundManager.play(soundId, options);
 }
 
 function stopSound(id) {

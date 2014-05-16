@@ -23,10 +23,7 @@ var volumeTransitions = {
 		var sound = sounds[soundId];
 
 		var diff = volume - sound.volume;
-		var volumeStep = Math.ceil(step * diff / time);
-
-		var min = Math.max(volume, 0);
-		var max = Math.min(volume, 100);
+		var volumeStep = step * diff / time;
 
 		clearInterval(sound.interval);
 		sound.interval = setInterval(function () {
@@ -78,7 +75,7 @@ function playSound(channelName, soundId, params) {
 		}
 	};
 
-	channel[soundId] = soundManager.play(soundId, options);
+	channel[soundId] = sound.play(options);
 }
 
 function stopSound(id) {

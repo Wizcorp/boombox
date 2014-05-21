@@ -62,6 +62,7 @@ function playSound(channelName, soundId, params) {
 
 	var sound = sounds[soundId];
 	sound.channel = channel;
+	sound.setVolume(settings[channelName].volume);
 
 	if (params.restart) {
 		sound.setPosition(0);

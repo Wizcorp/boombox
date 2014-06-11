@@ -58,8 +58,6 @@ function playSound(channelName, soundId, params) {
 
 	var channel = channels[channelName];
 
-	var onFinish = params.loop ? loopSound : deleteSound;
-
 	var sound = sounds[soundId];
 	sound.channel = channel;
 	sound.setVolume(settings[channelName].volume);
@@ -68,11 +66,23 @@ function playSound(channelName, soundId, params) {
 		sound.setPosition(0);
 	}
 
-	var options = { onfinish: onFinish, onstop: deleteSound };
+	var options = { onstop: deleteSound };
 
 	options.onload = function () {
 		if (sound.playState !== 1) {
 			sound.play();
+		}
+	};
+
+	options.onfinish = function () {
+		if (params.loop) {
+			return loopSound.call(sound);
+		}
+
+		deleteSound.call(sound);
+
+		if (typeof params.onfinish === 'function') {
+			params.onfinish();
 		}
 	};
 

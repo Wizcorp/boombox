@@ -201,6 +201,18 @@ BoomBox.prototype.add = function (name, url) {
 	add(name, url);
 };
 
+function skipTransition(sound) {
+	clearInterval(sound.interval);
+	sound.isInTransition = false;
+	if (sound.transition) {
+		sound.setVolume(sound.transition.volume);
+
+		if (sound.transition.callback) {
+			sound.transition.callback(id);
+		}
+	}
+}
+
 BoomBox.prototype.play = function (channelName, id, params) {
 	params = params || {};
 	var channel = channels[channelName];
@@ -217,15 +229,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 			return;
 		}
 
-		clearInterval(sound.interval);
-		sound.isInTransition = false;
-		if (sound.transition) {
-			sound.setVolume(sound.transition.volume);
-
-			if (sound.transition.callback) {
-				sound.transition.callback(id);
-			}
-		}
+		skipTransition(sound);
 	}
 
 	if (!sounds[id]) {

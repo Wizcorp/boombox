@@ -204,6 +204,7 @@ function skipTransition(sound) {
 
 	if (sound.transitionCallBack) {
 		sound.transitionCallBack(sound.id);
+		sound.transitionCallBack = null;
 	}
 }
 

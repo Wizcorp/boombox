@@ -25,10 +25,7 @@ var volumeTransitions = {
 
 		var sound = sounds[soundId];
 
-		sound.transition = {
-			volume: volume,
-			callback: cb
-		};
+		sound.transitionCallBack = cb;
 
 		var diff = volume - sound.volume;
 		var volumeStep = step * diff / time;
@@ -44,7 +41,7 @@ var volumeTransitions = {
 			if (newVolume === volume) {
 				clearInterval(sound.interval);
 				sound.isInTransition = false;
-				sound.transition = null;
+				sound.transitionCallBack = null;
 				if (cb) {
 					cb(soundId);
 				}
@@ -204,12 +201,9 @@ BoomBox.prototype.add = function (name, url) {
 function skipTransition(sound) {
 	clearInterval(sound.interval);
 	sound.isInTransition = false;
-	if (sound.transition) {
-		sound.setVolume(sound.transition.volume);
 
-		if (sound.transition.callback) {
-			sound.transition.callback(id);
-		}
+	if (sound.transitionCallBack) {
+		sound.transitionCallBack(sound.id);
 	}
 }
 

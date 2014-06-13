@@ -262,7 +262,6 @@ BoomBox.prototype.play = function (channelName, id, params) {
 	}
 
 	sound = sounds[id];
-	sound.isStarting = true;
 	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
@@ -270,9 +269,12 @@ BoomBox.prototype.play = function (channelName, id, params) {
 	}
 
 	var volume = params.volume || settings[channelName].volume;
+
+	sound.isStarting = true;
 	transitionFn(id, volume, function () {
 		sound.isStarting = false;
 	});
+
 	playSound(channelName, id, params);
 };
 

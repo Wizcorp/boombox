@@ -10,8 +10,11 @@ var sounds = {}; // list of available sounds
 var boombox;
 
 var volumeTransitions = {
-	none: function (soundId, params, cb) {
-		sounds[soundId].setVolume(params.volume);
+	none: function (soundId, volume, cb) {
+		var sound = sounds[soundId];
+		clearInterval(sound.interval);
+		sound.isInTransition = false;
+		sound.setVolume(volume);
 		if (cb) {
 			cb(soundId);
 		}
@@ -22,10 +25,16 @@ var volumeTransitions = {
 
 		var sound = sounds[soundId];
 
+		sound.transition = {
+			volume: volume,
+			callback: cb
+		};
+
 		var diff = volume - sound.volume;
 		var volumeStep = step * diff / time;
 
 		clearInterval(sound.interval);
+		sound.isInTransition = true;
 		sound.interval = setInterval(function () {
 			var newVolume = sound.volume + volumeStep;
 			newVolume = volumeStep > 0 ? Math.min(newVolume, volume) : Math.max(newVolume, volume);
@@ -34,6 +43,8 @@ var volumeTransitions = {
 
 			if (newVolume === volume) {
 				clearInterval(sound.interval);
+				sound.isInTransition = false;
+				sound.transition = null;
 				if (cb) {
 					cb(soundId);
 				}
@@ -49,8 +60,9 @@ function loopSound() {
 }
 
 function deleteSound() {
-	this.volume = 0;
+	this.setVolume(0);
 	delete this.channel[this.id];
+	this.channel = false;
 }
 
 function playSound(channelName, soundId, params) {
@@ -58,31 +70,20 @@ function playSound(channelName, soundId, params) {
 
 	var channel = channels[channelName];
 
+	var onFinish = params.loop ? loopSound : deleteSound;
+
 	var sound = sounds[soundId];
 	sound.channel = channel;
-	sound.setVolume(settings[channelName].volume);
 
 	if (params.restart) {
 		sound.setPosition(0);
 	}
 
-	var options = { onstop: deleteSound };
+	var options = { onfinish: onFinish, onstop: deleteSound };
 
 	options.onload = function () {
 		if (sound.playState !== 1) {
 			sound.play();
-		}
-	};
-
-	options.onfinish = function () {
-		if (params.loop) {
-			return loopSound.call(sound);
-		}
-
-		deleteSound.call(sound);
-
-		if (typeof params.onfinish === 'function') {
-			params.onfinish();
 		}
 	};
 
@@ -94,7 +95,6 @@ function stopSound(id) {
 
 	if (sound) {
 		sound.stop();
-		sound.channel = false;
 	}
 }
 
@@ -200,8 +200,22 @@ BoomBox.prototype.play = function (channelName, id, params) {
 		return;
 	}
 
+	var sound;
 	if (channel[id] && !params.restart) {
-		return;
+		sound = sounds[id];
+		if (!sound.isInTransition) {
+			return;
+		}
+
+		clearInterval(sound.interval);
+		sound.isInTransition = false;
+		if (sound.transition) {
+			sound.setVolume(sound.transition.volume);
+
+			if (sound.transition.callback) {
+				sound.transition.callback(id);
+			}
+		}
 	}
 
 	if (!sounds[id]) {
@@ -221,28 +235,26 @@ BoomBox.prototype.play = function (channelName, id, params) {
 		});
 	}
 
-	var transition;
+	var transitionFn;
 
 	if (!params.hasOwnProperty('stopAll') || params.stopAll) {
-		transition = params.stopTransition || 'fadeTo';
+		transitionFn = volumeTransitions[params.stopTransition || 'fadeTo'];
 		for (var fadeId in channel) {
 			if (fadeId !== id) {
-				volumeTransitions[transition](fadeId, 0, stopSound);
+				transitionFn(fadeId, 0, stopSound);
 			}
 		}
 	}
 
-	transition = params.transition || 'fadeTo';
-
-	var sound = sounds[id];
+	sound = sounds[id];
+	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
 		return console.error('the sound', id, 'does not exist.');
 	}
 
 	var volume = params.volume || settings[channelName].volume;
-	volumeTransitions[transition](id, volume);
-
+	transitionFn(id, volume);
 	playSound(channelName, id, params);
 };
 

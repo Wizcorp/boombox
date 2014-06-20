@@ -10,8 +10,11 @@ var sounds = {}; // list of available sounds
 var boombox;
 
 var volumeTransitions = {
-	none: function (soundId, params, cb) {
-		sounds[soundId].setVolume(params.volume);
+	none: function (soundId, volume, cb) {
+		var sound = sounds[soundId];
+		clearInterval(sound.interval);
+		sound.isInTransition = false;
+		sound.setVolume(volume);
 		if (cb) {
 			cb(soundId);
 		}
@@ -21,6 +24,9 @@ var volumeTransitions = {
 		var step = 50;
 
 		var sound = sounds[soundId];
+
+		sound.transitionCallBack = cb;
+		sound.isInTransition = true;
 
 		var diff = volume - sound.volume;
 		var volumeStep = step * diff / time;
@@ -34,6 +40,9 @@ var volumeTransitions = {
 
 			if (newVolume === volume) {
 				clearInterval(sound.interval);
+				sound.isInTransition = false;
+				sound.transitionCallBack = null;
+
 				if (cb) {
 					cb(soundId);
 				}
@@ -49,8 +58,9 @@ function loopSound() {
 }
 
 function deleteSound() {
-	this.volume = 0;
+	this.setVolume(0);
 	delete this.channel[this.id];
+	this.channel = false;
 }
 
 function playSound(channelName, soundId, params) {
@@ -60,7 +70,6 @@ function playSound(channelName, soundId, params) {
 
 	var sound = sounds[soundId];
 	sound.channel = channel;
-	sound.setVolume(settings[channelName].volume);
 
 	if (params.restart) {
 		sound.setPosition(0);
@@ -94,7 +103,6 @@ function stopSound(id) {
 
 	if (sound) {
 		sound.stop();
-		sound.channel = false;
 	}
 }
 
@@ -191,6 +199,16 @@ BoomBox.prototype.add = function (name, url) {
 	add(name, url);
 };
 
+function skipTransition(sound) {
+	clearInterval(sound.interval);
+	sound.isInTransition = false;
+
+	if (sound.transitionCallBack) {
+		sound.transitionCallBack(sound.id);
+		sound.transitionCallBack = null;
+	}
+}
+
 BoomBox.prototype.play = function (channelName, id, params) {
 	params = params || {};
 	var channel = channels[channelName];
@@ -200,8 +218,19 @@ BoomBox.prototype.play = function (channelName, id, params) {
 		return;
 	}
 
+	var sound;
+	// if the sound is already playing and we don't want to restart it
 	if (channel[id] && !params.restart) {
-		return;
+		sound = sounds[id];
+
+		// the sound volume is not in transition (fade) or it has
+		// just been started (fade in): we don't restart the sound.
+		if (sound.isStarting || !sound.isInTransition) {
+			return;
+		}
+
+		// the sound volume is in transition. we skip the transition and start the new requested one.
+		skipTransition(sound);
 	}
 
 	if (!sounds[id]) {
@@ -221,27 +250,30 @@ BoomBox.prototype.play = function (channelName, id, params) {
 		});
 	}
 
-	var transition;
+	var transitionFn;
 
 	if (!params.hasOwnProperty('stopAll') || params.stopAll) {
-		transition = params.stopTransition || 'fadeTo';
+		transitionFn = volumeTransitions[params.stopTransition || 'fadeTo'];
 		for (var fadeId in channel) {
 			if (fadeId !== id) {
-				volumeTransitions[transition](fadeId, 0, stopSound);
+				transitionFn(fadeId, 0, stopSound);
 			}
 		}
 	}
 
-	transition = params.transition || 'fadeTo';
-
-	var sound = sounds[id];
+	sound = sounds[id];
+	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
 		return console.error('the sound', id, 'does not exist.');
 	}
 
 	var volume = params.volume || settings[channelName].volume;
-	volumeTransitions[transition](id, volume);
+
+	sound.isStarting = true;
+	transitionFn(id, volume, function () {
+		sound.isStarting = false;
+	});
 
 	playSound(channelName, id, params);
 };

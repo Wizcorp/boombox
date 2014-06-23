@@ -51,16 +51,17 @@ var volumeTransitions = {
 	}
 };
 
-function loopSound() {
-	this.play({
-		onfinish: loopSound
-	});
-}
-
 function deleteSound() {
 	this.setVolume(0);
 	delete this.channel[this.id];
 	this.channel = false;
+}
+
+function loopSound() {
+	this.play({
+		onfinish: loopSound,
+		onstop: deleteSound
+	});
 }
 
 function playSound(channelName, soundId, params) {

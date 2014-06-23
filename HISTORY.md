@@ -1,6 +1,6 @@
 # Release history
 
-## vNext
+## v0.1.14
 
 ### Down the loophole
 When playing a sound with the infinite loop, the delete method was not called when trying to stop it. So it would keep

@@ -7,8 +7,6 @@ var channels = {}; // Maps of the created channels where sounds are played
 var settings = {}; // General settings for each channel (only volume at the moment)
 var sounds = {}; // list of available sounds
 
-var boombox;
-
 var volumeTransitions = {
 	none: function (soundId, volume, cb) {
 		var sound = sounds[soundId];
@@ -52,12 +50,14 @@ var volumeTransitions = {
 };
 
 function deleteSound() {
+	// this === sound object
 	this.setVolume(0);
 	delete this.channel[this.id];
 	this.channel = false;
 }
 
 function loopSound() {
+	// this === sound object
 	this.play({
 		onfinish: loopSound,
 		onstop: deleteSound
@@ -133,6 +133,7 @@ function add(id, url) {
 //Set up the sound manager.
 soundManager.setup({
 	url: '/assets/swf/default/',
+	preferFlash: false,
 	onready: function () {
 		sm2Loaded = true;
 
@@ -150,49 +151,40 @@ soundManager.setup({
 
 
 function loadSettings() {
-	var loadedSettings = localStorage.getItem('boomBox');
-
-	if (!loadedSettings) {
-		return;
-	}
-
 	try {
+		var loadedSettings = localStorage.getItem('boomBox') || '{}';
 		settings = JSON.parse(loadedSettings);
 	} catch (e) {
-		console.error('could not load the settings');
+		console.warn('[BoomBox]', 'Could not load the settings', e);
 	}
 }
 
 loadSettings();
 
 
-function BoomBox() {
-
-}
-
-BoomBox.prototype.saveSettings = function () {
+exports.saveSettings = function () {
 	try {
 		localStorage.setItem('boomBox', JSON.stringify(settings));
 	} catch (e) {
-		console.error('Could not save the settings');
+		console.warn('[BoomBox]', 'Could not save the settings', e);
 	}
 };
 
-BoomBox.prototype.getChannelVolume = function (channelName) {
+exports.getChannelVolume = function (channelName) {
 	if (!settings[channelName]) {
 		return 0;
 	}
 	return settings[channelName].volume;
 };
 
-BoomBox.prototype.addChannel = function (name, volume) {
+exports.addChannel = function (name, volume) {
 	if (!channels[name]) {
 		channels[name] = {};
 		settings[name] = settings[name] || { volume: volume };
 	}
 };
 
-BoomBox.prototype.add = function (name, url) {
+exports.add = function (name, url) {
 	if (sounds[name]) {
 		return;
 	}
@@ -210,12 +202,12 @@ function skipTransition(sound) {
 	}
 }
 
-BoomBox.prototype.play = function (channelName, id, params) {
+exports.play = function (channelName, id, params) {
 	params = params || {};
 	var channel = channels[channelName];
 
 	if (!channel) {
-		console.error('unknown channel', channelName);
+		console.warn('[BoomBox]', 'Unknown channel', channelName);
 		return;
 	}
 
@@ -236,7 +228,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 
 	if (!sounds[id]) {
 		if (!params.path) {
-			return console.warn('the sound', id, 'does not exist.');
+			return console.warn('[BoomBox]', 'The sound', id, 'does not exist.');
 		}
 
 		add(id, params.path);
@@ -266,7 +258,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
-		return console.warn('the sound', id, 'does not exist.');
+		return console.warn('[BoomBox]', 'The sound', id, 'does not exist.');
 	}
 
 	var volume = params.volume || settings[channelName].volume;
@@ -279,15 +271,15 @@ BoomBox.prototype.play = function (channelName, id, params) {
 	playSound(channelName, id, params);
 };
 
-BoomBox.prototype.stopChannel = function (channelName, params) {
+exports.stopChannel = function (channelName, params) {
 	var soundList = [];
 	for (var id in channels[channelName]) {
 		soundList.push(id);
 	}
-	this.stop(soundList, params);
+	exports.stop(soundList, params);
 };
 
-BoomBox.prototype.stop = function (soundList, params) {
+exports.stop = function (soundList, params) {
 	params = params || {};
 
 	if (typeof soundList === 'string') {
@@ -308,11 +300,11 @@ BoomBox.prototype.stop = function (soundList, params) {
 /**
  * Mute audio on all channels.
  */
-BoomBox.prototype.muteAll = function () {
+exports.muteAll = function () {
 	soundManager.mute();
 };
 
-BoomBox.prototype.mute = function (channelName, params) {
+exports.mute = function (channelName, params) {
 	params = params || {};
 
 	var channel = channels[channelName];
@@ -326,11 +318,11 @@ BoomBox.prototype.mute = function (channelName, params) {
 /**
  * Unmute audio on all channels
  */
-BoomBox.prototype.unmuteAll = function () {
+exports.unmuteAll = function () {
 	soundManager.unmute();
 };
 
-BoomBox.prototype.unmute = function (channelName, params) {
+exports.unmute = function (channelName, params) {
 	params = params || {};
 
 	var channel = channels[channelName];
@@ -341,13 +333,13 @@ BoomBox.prototype.unmute = function (channelName, params) {
 	}
 };
 
-BoomBox.prototype.setVolume = function (channelName, volume) {
-	if (volume > 100) {
-		volume = 100;
+exports.setVolume = function (channelName, volume) {
+	if (isNaN(volume)) {
+		return;
 	}
-	if (volume < 0) {
-		volume = 0;
-	}
+
+	volume = Math.min(volume, 100);
+	volume = Math.max(volume, 0);
 
 	settings[channelName].volume = volume;
 
@@ -357,16 +349,14 @@ BoomBox.prototype.setVolume = function (channelName, volume) {
 	}
 };
 
-BoomBox.prototype.isMuted = function () {
+exports.isMuted = function () {
 	return soundManager.muted;
 };
 
-BoomBox.prototype.toggleMuteAll = function () {
+exports.toggleMuteAll = function () {
 	if (soundManager.muted) {
 		soundManager.unmuteAll();
 	} else {
 		soundManager.muteAll();
 	}
 };
-
-module.exports = boombox = new BoomBox();

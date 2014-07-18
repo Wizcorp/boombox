@@ -174,7 +174,7 @@ BoomBox.prototype.saveSettings = function () {
 	try {
 		localStorage.setItem('boomBox', JSON.stringify(settings));
 	} catch (e) {
-		console.error('could not save the settings');
+		console.error('Could not save the settings');
 	}
 };
 
@@ -236,7 +236,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 
 	if (!sounds[id]) {
 		if (!params.path) {
-			return console.error('the sound', id, 'does not exist.');
+			return console.warn('the sound', id, 'does not exist.');
 		}
 
 		add(id, params.path);
@@ -266,7 +266,7 @@ BoomBox.prototype.play = function (channelName, id, params) {
 	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
-		return console.error('the sound', id, 'does not exist.');
+		return console.warn('the sound', id, 'does not exist.');
 	}
 
 	var volume = params.volume || settings[channelName].volume;
@@ -342,8 +342,11 @@ BoomBox.prototype.unmute = function (channelName, params) {
 };
 
 BoomBox.prototype.setVolume = function (channelName, volume) {
-	if (volume > 100 || volume < 0) {
-		return console.error('Volume needs to be a number between 0 and 100');
+	if (volume > 100) {
+		volume = 100;
+	}
+	if (volume < 0) {
+		volume = 0;
 	}
 
 	settings[channelName].volume = volume;

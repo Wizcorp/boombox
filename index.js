@@ -2,7 +2,7 @@ require('soundmanager2');
 
 var soundManager = window.soundManager;
 var sm2Loaded = false; // Indicates whether SM2 has been loaded or not.
-var queue = []; // Queue where we stuff adds and plays before SM2 has been loaded.
+var queue = {}; // Queue where we stuff adds and plays before SM2 has been loaded.
 var channels = {}; // Maps of the created channels where sounds are played
 var settings = {}; // General settings for each channel (only volume at the moment)
 var sounds = {}; // list of available sounds
@@ -111,11 +111,11 @@ function add(id, url) {
 
 	//Check if SM2 is loaded. If not, stuff it in a queue so we can set up the audio later.
 	if (!sm2Loaded) {
-		queue.push({
+		queue[id] = {
 			action: 'add',
 			id: id,
 			url: url
-		});
+		};
 
 		return;
 	}
@@ -127,23 +127,29 @@ function add(id, url) {
 		autoPlay: false,
 		autoLoad: false
 	});
+
 	sounds[id].channel = false;
 }
 
 //Set up the sound manager.
 soundManager.setup({
-	url: '/assets/swf/default/',
+	url: '/',
 	preferFlash: false,
 	onready: function () {
 		sm2Loaded = true;
 
-		for (var i = 0, l = queue.length; i < l; i++) {
-			var queued = queue[i];
+		var sounds = Object.keys(queue);
+
+		while (sounds.length) {
+			var queueId = sounds.pop();
+			var queued = queue[queueId];
+
+			delete queue[queueId];
 
 			if (queued.action === 'add') {
 				add(queued.id, queued.url);
 			} else if (queued.action === 'play') {
-				boombox.play(queued.channel, queued.id, queued.params);
+				exports.play(queued.channel, queued.id, queued.params);
 			}
 		}
 	}
@@ -202,13 +208,19 @@ function skipTransition(sound) {
 	}
 }
 
+function onError(error, onFinish) {
+	if (typeof onFinish === 'function') {
+		onFinish();
+	}
+	return console.warn('[BoomBox]', error);
+}
+
 exports.play = function (channelName, id, params) {
 	params = params || {};
 	var channel = channels[channelName];
 
 	if (!channel) {
-		console.warn('[BoomBox]', 'Unknown channel', channelName);
-		return;
+		return onError('Unknown channel ' + channelName, params.onfinish);
 	}
 
 	var sound;
@@ -227,20 +239,22 @@ exports.play = function (channelName, id, params) {
 	}
 
 	if (!sounds[id]) {
-		if (!params.path) {
-			return console.warn('[BoomBox]', 'The sound', id, 'does not exist.');
+		if (queue[id]) {
+			return onError('The sound ' + id + ' is not loaded yet.', params.onfinish);
+		} else if (!params.path) {
+			return onError('The sound ' + id + ' does not exist.', params.onfinish);
 		}
 
 		add(id, params.path);
 	}
 
 	if (!sm2Loaded) {
-		return queue.push({
+		return queue[id] = {
 			action: 'play',
 			id: id,
 			channel: channelName,
 			params: params
-		});
+		};
 	}
 
 	var transitionFn;
@@ -258,7 +272,7 @@ exports.play = function (channelName, id, params) {
 	transitionFn = volumeTransitions[params.transition || 'fadeTo'];
 
 	if (!sound) {
-		return console.warn('[BoomBox]', 'The sound', id, 'does not exist.');
+		return onError('The sound ' + id + ' does not exist.', params.onfinish);
 	}
 
 	var volume = params.volume || settings[channelName].volume;

@@ -1,5 +1,18 @@
 # Release history
 
+## v0.1.16
+
+### Not loaded and calls
+When using flash, soundManager2 has not been loaded, therefore the sounds are still in the queue.
+So now a warning is outputted for this case and for any error the callback `onfinish` is called.
+
+
+## v0.1.15
+
+### No need for big alarm
+Transforming console errors to warnings
+
+
 ## v0.1.14
 
 ### Down the loophole
